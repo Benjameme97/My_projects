@@ -1,0 +1,444 @@
+
+<!-- saved from url=(0071)http://www.cs.cas.cz/martinkova/documents/NMST570_FinalProject_2021.Rmd -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252"></head><body>---
+title: 'Selected Topics of Psychometrics (NMST570)'
+subtitle: 'Final project'
+author: 'Benjamín Kunc, Kateřina H'
+date: \today
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+---
+
+<!-- Chunk options: https://bookdown.org/yihui/rmarkdown-cookbook/hide-one.html -->
+
+<br>
+
+
+Task: http://www.cs.cas.cz/martinkova/documents/NMST570_FinalProject_2021.pdf
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+library(ShinyItemAnalysis)
+library(dplyr)
+library(psych)
+library(corrplot)
+library(ggdendro)
+library(mirt)
+library(aod)
+library(deltaPlotR)
+library(difNLR)
+library(difR)
+library(ggplot2)
+library(ltm)
+library(cowplot)
+library(Cairo)
+
+knitr::opts_chunk$set(
+	fig.pos = "h",
+	message = FALSE,
+	warning = FALSE,
+	echo = FALSE
+)
+
+theme_fig <- function(base_size = 17, base_family = "") {
+  theme_bw(base_size = base_size, base_family = base_family) +
+    theme(
+      legend.key = element_rect(fill = "white", colour = NA),
+      axis.line = element_line(colour = "black"),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      plot.title = element_blank(),
+      legend.background = element_blank()
+    )
+}
+
+theme_fig_title <- function(base_size = 17, base_family = "") {
+  theme_bw(base_size = base_size, base_family = base_family) +
+    theme(
+      legend.key = element_rect(fill = "white", colour = NA),
+      axis.line = element_line(colour = "black"),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      # plot.title = element_blank(),
+      legend.background = element_blank()
+    )
+}
+
+```
+
+### Data
+
+```{r load_data, echo=FALSE, message=FALSE, warning=FALSE}
+data <- CZmaturaS
+
+data$FirstAtt <- factor(data$FirstAtt)
+data$SchTypeGY <- factor(data$SchTypeGY)
+
+# summary(data$Total)
+hist(data$Total)
+
+
+
+data %>%
+  group_by(SchTypeGY) %>%
+  summarise(mean(Total))
+
+
+data <- data %>% mutate(Zscore = scale(Total)) %>%
+  mutate(Tscore = Zscore*10 + 50) %>%
+  mutate(Percentile = (Total/max(Total, na.rm = F))*100) %>%
+  mutate(Success = ifelse(Total >= 16.5, 1, 0))
+
+# sum(data$Success)/nrow(data)*100 
+# 
+# table(data$Percentile == min(data$Percentile)) 
+
+```
+
+For my final project I chose to work with CZmaturaS dataset from ShinyItems package (or originally from https://cermat.cz/). I assume that the project will be doable with it, since it is a well structured and clean sample from a psychometric dataset. While there is also the option to work with the CZmatura data, I suppose that it is unnecessarily big and that it would cause the code to be processed more slowly. 
+
+The sample consists of 2,000 observations of 75 variables with information about Matura exams from 2019. These variables include School type (categorical), First attempt indicator (nominal), School type grammar school indicator (nominal), Item answers (continous), Scores answers (continuous), Total scores (sum of item scores; continuous), Score estimated from IRT model, and its Standard error (both continuous).
+
+Full item wording for the data and other information (including that the threshold for success is 33% of the total score) can be found in this report: https://data.cermat.cz/files/files/Matematika/MAPLUS_hodnotici_zprava_2019.pdf
+
+The two nominal variables (First attempt indicator and the School type grammar school) were coded as numeric so I have recoded them to factors.
+
+From all the students in the data set (N = 2000), 42 % (N = 841) were visiting some kind of grammar school. I have tested the difference in total scores between students of grammar schools and those visiting other types of schools with Wilcoxon rank sum test and arrived at significant difference. The mean for grammar school students was 35.12 and for non-grammar school students 22.13.
+
+I have calculated Z-scores, T-scores, percentiles and the overall success rate of the students.
+The percentile does not have the usual attributes (mean and median at values of 50, minimum at 1). I suppose that the cause lies in the fact that some students had the same values of the total scores (three of them had the minimal scores).
+The overall success rate (Total score higher or equal to 33 % of the maximum) was 79 %. 
+
+The first student from the data set was visiting the four year grammar school. This attempt was her first one and she passed it with total score of 31 with percentile 62, Z-score 0.28, T-score 52.85 and the IRT score 0.34.
+
+<br>
+
+
+### Test validity
+
+```{r test_validity, echo='FALSE', message='FALSE', warning=FALSE}
+
+corP <- psych::polychoric(data[, 41:70])
+
+# corP$rho
+
+ShinyItemAnalysis::plot_corr(data[, 41:70], cor = "polychoric")
+
+cl <- hclust(as.dist(1 - corP$rho), method = "ward.D2")
+
+ggdendrogram(cl)
+
+
+data[,41:71] %>% 
+  plot_corr(corr = "polychoric",
+          clust_method = "ward.D2",
+          n_clust = 5,
+          shape = 'square',
+          labels = TRUE,
+          labels_size = 4,
+          line_col = 'red',
+          fill = 'blue',
+          fill_alpha = 0.1)
+
+cormat <- polychoric(data[, 41:70])$rho
+
+
+## Factor analysis 
+
+psy::scree.plot(cormat)
+
+fanalysis1 <- fa(cormat, cor = "Pearson", nfactors = 1, 
+                  fm = "ml")
+
+summary(fanalysis1)
+print(fanalysis1$loadings, cutoff = 0)
+
+fanalysis5 <- fa(cormat, cor = "Pearson", nfactors = 5, 
+                  fm = "ml")
+
+summary(fanalysis5)
+print(fanalysis5$loadings, cutoff = 0)
+
+fanalysis6 <- fa(cormat, cor = "Pearson", nfactors = 6, 
+                  fm = "ml")
+
+summary(fanalysis6)
+print(fanalysis6$loadings, cutoff = 0)
+
+fanalysis7 <- fa(cormat, cor = "Pearson", nfactors = 7, 
+                  fm = "ml")
+
+summary(fanalysis7)
+print(fanalysis7$loadings, cutoff = 0)
+```
+Test validity refers to the strength of the association between what the test measures and the hypothesized construct that we want to measure. Validity might be the most important attribute of any psychometric test.
+
+As described above, the data come from Matura tests. Their aim is to assess the level of students' knowledge by the end of their high schools. The success in Matura exams provides the students with certification of finishing high school. Another potential purpose of these exams' results could be use them as an indicator for the student's ability to study at universities. 
+
+To assess the content validity of the tests, there should be an agreement between experts on what is expected from providing somebody high school education. 
+
+The criterion validity could be measured by correlation with some other tests. For example with math grades from high school or with the scores of admission tests at universities. It could be argued however, whether the grades or admission tests actually measure the construct of the mathematical knowledge or rather only some part of it. If all of these types of tests measured the same construct in its all dimensions, there would probably be no need for the Matura exams, since their incremental validity would be quite dubious. In such case, it could be stated that the high school grades have a great predictive validity of the students' knowledge after she graduated from the school.
+
+Furthermore, it would be optimal to assess the discriminant validity. It should be clear whether the total score and success in Matura tests is anyhow affected by socio-demographic factors, such as sex and gender or belonging to some minority. 
+
+Based on the dendrogram, I suppose that there might be about five clusters of items which have higher inter-item correlation inside than with other items outside of the cluster. Therefore, I decided to create a correlation plot and set the number of clusters to five. These five clusters might reflect five types of items or five mathematical topics, which are being tested.
+
+While there might be five clusters of correlating items, I still assume that the latent construct (high school math skills/knowledge) is a single factor. To test this assumption, I decided to create a scree plot and then tried exploratory factor analyses with one, five, six and seven factors respectively. Comparison of their RMSE shows that adding more factors decreases the error but also the number of degrees of freedom. From five to more factors, the decline of RMSE stops while the degrees of freedom continue to decrease. 
+
+Taking the results of the analysis altogether, I conclude that in spite of the assumption that the Matura test from math measures one latent construct, it seems that there are five dimensions rather than one. A deeper analysis could reveal the difficulty of each of the skill underlying these latent constructs. It should also be stated, however, that all of the items positively correlate with each other, just like the five assumed constructs. 
+
+<br>
+
+
+### Test reliability
+
+```{r test_reliability, echo=FALSE, message=FALSE, warning=FALSE}
+
+# random split with spearman-brown formula
+
+items <- data[,41:70]
+
+bin_fun <- function(x) {
+  ifelse(x > median(x), 1, 0)
+}
+
+items_binarized <- as.data.frame(sapply(items, FUN = bin_fun))
+
+
+set.seed(15) 
+samp <- sample(1:30, 15) 
+df_rel1 <- items[, samp]
+df_rel2 <- items[, setdiff(1:30, samp)]
+
+ts_rs1 <- rowSums(df_rel1)
+ts_rs2 <- rowSums(df_rel2)
+
+
+cor.rs <- cor(ts_rs1, ts_rs2)
+2 * cor.rs / (1 + cor.rs)
+
+# alpha estimate
+
+psych::alpha(items)$total$raw_alpha
+
+# twice more items
+
+rho.original <- 0.8898933
+items.original <- 30
+items.new <- 60
+(m <- items.new / items.original) 
+
+m * rho.original / (1 + (m - 1) * rho.original)
+
+(m * rho.original / (1 + (m - 1) * rho.original))/rho.original
+
+# alpha 0.9 
+
+# n/items.original * rho.original / (1 + (n/items.original - 1) * rho.original)
+
+n <- (9*items.original)/rho.original - 9*items.original
+round(n)
+
+```
+
+The reliability is one of the most important attributes of any psychometric measurement. It is a crucial condition for tests to be valid. 
+
+I estimated the reliability by using the Spearman-Brown formula on a randomly split data.
+The result is 0.901. This, according to the Cicchetti’s cut-off values shows a very high reliability. 
+When I used the Cronbach's alpha, I arrived at reliability of 0.889, which is still quite high but not exceeding the value of 0.9 (sometimes recommended for intelligence tests). In order to achieve the calue of 0.9, I would need at least 33 items (instead of 30). If the original number of items was doubled, the Cronbach's alpha would increase to 0.94. 
+
+Other estimates of reliability could be test-retest and parallel-forms method. For test-retest estimation, I would need the participants who were assessed in the current data set to take the test again after some time. For estimating reliability by the parallel forms method, there would need to be a test consisted of items which are ideally the same or at least very similar in terms of their content. 
+
+<br>
+
+
+### Item analysis using traditional methods or regression models
+
+```{r item_analysis, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+ItemAnalysis(items)
+
+min(ItemAnalysis(items)$ULI)
+max(ItemAnalysis(items)$ULI)
+
+min(ItemAnalysis(items)$Difficulty)
+max(ItemAnalysis(items)$Difficulty)
+
+min(ItemAnalysis(items)$RIR)
+max(ItemAnalysis(items)$RIR)
+
+min(ItemAnalysis(items)$RIT)
+max(ItemAnalysis(items)$RIT)
+
+summary(ItemAnalysis(items)$Alpha.drop)
+
+
+##Estimating difficulty:
+
+find_diff <- function(x) {
+ 1 - mean(x == max(x))
+}
+
+items_distran <- data.frame(cbind(items, data$SchTypeGY, data$Total))
+
+difficulty <- data.frame(lapply(items_distran[,1:30], find_diff))
+
+items_key <- subset(items_distran, data.Total == 50)[1,1:30]
+
+DDplot(
+  Data = items, discrim = "ULI")
+
+# distractor analysis for b3.2 and b4 and also b2 and b9.2
+
+DistractorAnalysis(items_distran, key = 32, criterion = items_distran$data.Total, crit.discrete = T)
+
+plotDistractorAnalysis(
+  Data = items_distran, criterion = items_distran$data.Total,
+  item = 4,
+  item.name = "b3.2",
+  crit.discrete = TRUE)
+
+plotDistractorAnalysis(
+  Data = items_distran, criterion = items_distran$data.Total,
+  item = 5, 
+  item.name = "b4",
+  crit.discrete = TRUE)
+
+plotDistractorAnalysis(
+  Data = items_distran, criterion = items_distran$data.Total,
+  item = 2, 
+  item.name = "b2",
+  crit.discrete = TRUE)
+
+plotDistractorAnalysis(
+  Data = items_distran, criterion = items_distran$data.Total,
+  item = 13, 
+  item.name = "b9.2",
+  crit.discrete = TRUE)
+
+
+items_adjusted <- as.data.frame(ifelse(items[,1:30] > 0,1,0)) # binarization
+
+
+# fitting 3PL model
+fit <- mirt(items_adjusted, model = 1, itemtype = "3PL", SE = TRUE)
+fit2 <- mirt(items_adjusted, model = 1, itemtype = "2PL", SE = TRUE)
+fit4 <- mirt(items_adjusted, model = 1, itemtype = "4PL", SE = TRUE)
+
+# item response curves for b3.2 and b4
+
+itemplot(fit, 4)
+# itemplot(fit, 4, CE = TRUE)
+
+itemplot(fit, 5)
+# itemplot(fit, 5, CE = TRUE)
+
+
+# estimated parameters
+
+coef(fit)$b3.2 # classical intercept-slope parametrization with CI
+
+coef(fit, IRTpars = TRUE)$b3.2  # IRT parametrization with CI
+
+coef(fit)
+
+# Provide model equation(s) and interpretation of parameters. Which method was used for
+# estimation of parameters?
+
+# abilities 
+fit_Se <- mirt::fscores(fit, full.scores.SE = TRUE)
+head(fit_Se, n = 3)
+
+plot(fit, type = "trace", facet_items = FALSE)
+
+b <- coef(fit, "IRTpars" = TRUE, simplify = TRUE)
+
+fs_SE <- fscores(fit, full.scores.SE = TRUE)
+
+ggWrightMap(fs_SE[,1], b$items)
+
+
+itemplot(fit, item = 1, type = "infotrace")
+itemplot(fit, item = 1, type = "infoSE")
+
+
+plot(fit, type = "infotrace", facet_items = FALSE)
+
+plot(fit, type = "infoSE")
+
+
+## ability estimates for first respondent
+fs <- as.vector(fscores(fit))
+sts <- as.vector(scale(rowSums(items_binarized[,1:5])))
+
+ability1 = fs[1]
+se1 = sts[1]
+
+plot(fs ~ sts, xlab = "Standardized total score", ylab = "Factor score")
+cor(fs, sts)
+
+
+```
+Item analysis can be a substantial source of information about the test. In this part, I decided to focus on the first five items of the data set. 
+
+According to my analysis, the most and the least difficult items are b3.2 (0.867) and b4 (0.244). However, the item analysis for this data set is very confusing. When searching for the wording of the items, I encountered the analytic results of the Matura exams from mathematics for the given year. The published results seem to relate to completely different data set than the one I have analyzed here. This holds both for the whole data set CZmatura and the sample CZmaturaS, which I am using here. One of the implication is that I do not know the wording of the analyzed items, which impairs conclusions and prevents me from checking on possible errors that I could have done.
+
+The difficulty estimates correspond to the distractor plots. For the item b3.2 the proportion of choosing a distractor vs the correct answers starts shifting somewhere around total score of 35. On the other hand, we can see that for item b4, this shift arrives at much lower score - 15.
+
+Lowest upper-lower index can be spotted at item b9.2 with value of 0.330 while the highest is at b2 (0.76). Since the lowest ULI is well above the traditional threshold of 0.2, I assume that all items work well in terms of both difficulty and ULI.
+
+The lowest correlation with both the rest of items and the total score has the item b9.2 followed by b9.1, while the highest value of both RIR and RIT has item b2.
+
+The alpha drop values range from 0.88 to 0.89 for all of the items. 
+
+I have also looked at the coefficients of a 3PL regression model. I chose 3PL beacause I assume that students could guess the correct answer and I also expect that Matura tests are too important for the students to not be fully attentive, which would require using 4PL model. The a parameter tells us how much a log-odds ratio of providing a correct answer changes if the level of ability changes by one unit. In the case of item b3.2, I think the a parameter is very high. The b parameter is the level of ability needed to have a 1/2 probability of giving the correct answer. The guessing parameter g is rather low (at least for the explored item - b3.2), which I interpret as a low incidence of guessing correct answers in this data set.
+
+Estimated abilitz of the first respondent is 0.25, SE is -0.51.
+
+The relationship between STS and IRT estimates seems to be quite strong and positive with correlation coefficient at 0.81.
+
+For theta = 0, the most informative item is b2. This seems to hold even for theta = -1 (1 SD below average). For theta = 1, the most informative could be either b3.2 or b3.1.
+
+<br>
+
+
+### Differential item functioning
+
+```{r differential_item_functioning, echo=FALSE, message=FALSE, warning=FALSE}
+
+summary(lm(data$Total ~ as.factor(data$SchTypeGY)))
+
+(DP_fixed <- deltaPlotR::deltaPlot(data = items_distran, group = "data.SchTypeGY",
+                                   focal.name = 1, thr = 1.5))
+
+(DP_norm <- deltaPlotR::deltaPlot(data = items_distran, group = "data.SchTypeGY",
+                                  focal.name = 1, thr = "norm"))
+```
+
+The differential item functioning is an important part of every psychometric analysis. Through this analysis, it is possible to see whether items work equally for different groups of subjects. It can be estimated as a difference in item scores between two subjects with the same level of latent variable.
+
+In this analysis, I divided subjects into two groups: those who attended grammar school and those who have not. It is not surprising that students from grammar schools had significantly higher total scores in the tests. What the DIF can show us is which items could be considered as unfair - meaning that they lead subjects of the same level of knowledge to different results.
+
+I have tried two types of DIF analyses - the fixed threshold and the normal approximation threshold. I found that some items differentiate between the two groups of students in both of the methods. Via the fixed threshold method I found 17 items while with the normal approximation threshold, only 4 of them remained as significantly differentiating.
+
+For further steps of DIF analysis, I would need other types of grouping variables in the data. For example, it might be useful to estimate DIF for different genders or people from demographic minorities.
+
+
+<br>
+
+
+### Discussion
+
+In this analysis, I explored and analyzed a sample of data from mathematical Matura test. The analysis shows that overall, the psychometric attributes of the test seem good. In the constraints of the available data, I found a very good reliability and validity of the test. It seems that the test is coherent and really does measure the construct of mathematical knowledge. However, it would be optimal to have more data, especially for the estimation of validity. 
+
+The analysis of selected items and distractors also seem to show that the items work well. But it also needs to be pointed out that there is probably some kind of unfairness in the test. The students of grammar school seem to have advantage even in cases of the same level of knowledge (even though these students seem to have overall better mathematical knowledge). Furthermore, the analysis lacks information about wording of the items, which impairs the credibility of my conclusions. 
+
+
+
+<br>
+
+</body></html>
