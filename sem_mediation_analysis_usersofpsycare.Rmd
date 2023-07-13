@@ -1,0 +1,212 @@
+---
+title: "Mediation analysis - users of psychiatric care in Czechia"
+author: "Benjamin Kunc"
+date: "13 03 2023"
+geometry: margin=2.5cm
+output:
+  word_document: default
+  pdf_document: 
+    toc: true
+    extra_dependencies: flafter
+    includes:
+      in_header: header.tex
+  html_document: 
+    toc: yes
+    latex_engine: xelatex
+    sansfont: Open Sans
+header-includes: \usepackage{float} \floatplacement{table}{H} 
+always_allow_html: yes
+fontsize: 13pt
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+\newpage
+
+```{r prepare data for estimation ismi whodas}
+library(dplyr)
+
+data_est <- as.data.frame(read.csv("data_sem.csv") %>%
+  select(c(i17.1_ISMI_škála_17.1_Duševně_nemocní_lidé_mají_sklon_k_násilí.:i18.12_Sebehodnotící_škála_WHODAS_18.12_Vaše_každodenní_práce_škola, i1.2_Jaké_je_Vaše_pohlaví, i1.3_Věk, i2.1_S_duševním_onemocněním_se_léčím, i1.4_Dosažené_vzdělaní, i16.2_V_současné_době_se_můj_čistý_měsíční_příjem_pohybuje_v_rozmezí, i5.19_Bya_jste_někdy_v_nemocnici_hospitalizován_a_nedobrovolně, i2.2_Zajímáte_se_o_dění_v_psychiatrické_reformě, i3.3_Podílíte_se_na_rozhodování_o_systému_péče_o_duševní_zdraví_Pozn._Pokud_jste_ano_nebo_spíše_ano_._neodpovídejte_na_otázku_3.4., i5.1_Cítil_a_jste_se_během_Vašeho_pobytu_v_nemocnici_v_bezpečí, i5.2_Cítil_a_jste_z_chování_personálu_respekt_k_Vaší_osobě, i5.5_Vzbuzovala_ve_Vás_péče_v_nemocnici_naději_do_budoucna, i6.1_Cítil_a_jste_se_během_Vašeho_pobytu_v_denním_stacionáři__v_bezpečí, i6.2_Cítil_a_jste_z_chování_personálu_ve_stacionáři_respekt_k_Vaší_osobě, i6.5_Vzbuzovala_ve_Vás_péče_v_denním_stacionáři_naději_do_budoucna, i7.1_Cítil_a_jste_se_v_ordinaci_Vašeho_ambulantního_psychiatra_v_bezpečí, i7.2_Cítil_a_jste_z_chování_Vašeho_ambulantního_psychiatra_respekt_k_Vaší_osobě, i7.4_Vzbuzovala_ve_Vás_péče_ambulantního_psychiatra_naději_do_budoucna, i8.1_Cítil_a_jste_se_během_psychoterapeutických_sezení_v_bezpečí, i8.2_Cítil_a_jste_z_chování_psychoterapeuta_respekt_k_Vaší_osobě, i8.3_Vzbuzovala_péče_psychoterapeuta_ve_Vás_naději_do_budoucna, i11.1_Cítil_a_jste_se_během_návštěvy_komunitního_sociálního_terénního_týmu_v_bezpečí, i11.2_Cítil_a_jste_z_chování_profesionálů_komunitního_sociálního_terénního_týmu_respekt_k_Vaší_osobě, i11.3_Vzbuzovala_péče_komunitního_sociálního_terénního_týmu_ve_Vás_naději_do_budoucna)) %>%
+    mutate(i17.2_ismi_škála_17.2_Lidé_s_duševní_nemocí_prospívají_společnosti. = min(as.numeric(i17.2_ismi_škála_17.2_Lidé_s_duševní_nemocí_prospívají_společnosti.), na.rm = T) + max(as.numeric(i17.2_ismi_škála_17.2_Lidé_s_duševní_nemocí_prospívají_společnosti.), na.rm = T) - as.numeric(i17.2_ismi_škála_17.2_Lidé_s_duševní_nemocí_prospívají_společnosti.)) %>%
+  mutate(i17.9_ismi_škála_17.9_Mohu_žít_dobrý_a_naplňující_život._i_když_jsem_duševně_nemocný_á. = min(as.numeric(i17.9_ismi_škála_17.9_Mohu_žít_dobrý_a_naplňující_život._i_když_jsem_duševně_nemocný_á.), na.rm = T) + max(as.numeric(i17.9_ismi_škála_17.9_Mohu_žít_dobrý_a_naplňující_život._i_když_jsem_duševně_nemocný_á.), na.rm = T) - as.numeric(i17.9_ismi_škála_17.9_Mohu_žít_dobrý_a_naplňující_život._i_když_jsem_duševně_nemocný_á.)))
+  
+
+names(data_est) <- c("ismi_1", "ismi_2", "ismi_3",
+                 "ismi_4", "ismi_5", "ismi_6",
+                 "ismi_7", "ismi_8", "ismi_9",
+                 "ismi_10",
+                 "whodas_1", "whodas_2", "whodas_3",
+                 "whodas_4", "whodas_5", "whodas_6",
+                 "whodas_7", "whodas_8", "whodas_9",
+                 "whodas_10", "whodas_11", "whodas_12",
+                 "Gender", "Age", "Length_treatment",
+                 "Education", "Monthly_income", "Involuntary_hospitalization",
+                 "Interest_reform", "Involvement_reform",
+                 "Safe_hospital", "Respect_hospital", "Hope_hospital",
+                 "Safe_daycare", "Respect_daycare", "Hope_daycare",
+                 "Safe_amb_psychiatry", "Respect_amb_psychiatry", "Hope_amb_psychiatry",
+                 "Safe_psychotherapy", "Respect_psychotherapy", "Hope_psychotherapy",
+                 "Safe_community_team", "Respect_community_team", "Hope_community_team")
+
+data_est$`Involuntary_hospitalization` <- as.ordered(factor(data_est$`Involuntary_hospitalization`, levels = c("Ne", "Ano")))
+data_est$Gender <- as.ordered(factor(data_est$Gender, levels = c("Žena", "Muž")))
+data_est$Interest_reform <- as.ordered(factor(data_est$Interest_reform, levels = c("Ne", "Ano")))
+
+scores_tofactors <- colnames(select(data_est, c("Age", "Length_treatment", "Education", "Monthly_income")))
+
+data_est <- data_est %>%
+  mutate_at(scores_tofactors,
+            funs(as.ordered(factor(.))))
+
+data_num_est <- data_est %>%
+  select(matches("ismi|whodas", ignore.case = T)) %>%
+  sapply(., FUN = function(x) as.numeric(x))
+
+data_est <- data.frame(cbind(data_num_est, data_est[,23:45]))
+
+names(data_est) <- c("ismi_1", "ismi_2", "ismi_3",
+                 "ismi_4", "ismi_5", "ismi_6",
+                 "ismi_7", "ismi_8", "ismi_9",
+                 "ismi_10",
+                 "whodas_1", "whodas_2", "whodas_3",
+                 "whodas_4", "whodas_5", "whodas_6",
+                 "whodas_7", "whodas_8", "whodas_9",
+                 "whodas_10", "whodas_11", "whodas_12",
+                 "Gender", "Age", "Length_treatment",
+                 "Education", "Monthly_income", "Involuntary_hospitalization",
+                 "Interest_reform", "Involvement_reform",
+                 "Safe_hospital", "Respect_hospital", "Hope_hospital",
+                 "Safe_daycare", "Respect_daycare", "Hope_daycare",
+                 "Safe_amb_psychiatry", "Respect_amb_psychiatry", "Hope_amb_psychiatry",
+                 "Safe_psychotherapy", "Respect_psychotherapy", "Hope_psychotherapy",
+                 "Safe_community_team", "Respect_community_team", "Hope_community_team")
+
+```
+
+
+```{r SEM no_mediation estimated cfa ismi whodas}
+library(lavaan) 
+
+model_est_nomed <-'
+## Measurement ##
+ISMI =~ ismi_1 + ismi_2 + ismi_3 +ismi_4 + ismi_5 + ismi_6 + ismi_7 + ismi_8 + ismi_9 + ismi_10 
+
+WHODAS =~ whodas_1 + whodas_2 + whodas_3 + whodas_4 + whodas_5 + whodas_6 + whodas_7 + whodas_8 + whodas_9 + whodas_10 + whodas_11 + whodas_12
+
+## Direct effects ##
+ISMI ~ WHODAS 
+
+'
+
+fit_model_est_nomed <- cfa(model = model_est_nomed, # model formula
+                   data=data_est # data frame
+  )
+
+summary(fit_model_est_nomed, fit.measures = T, standardized=TRUE)
+
+```
+
+```{r SEM no_mediation visualization estimated cfa ismi whodas}
+library(tidySEM)
+
+lay <- get_layout(
+"", "Involuntary_hospitalization", "",  
+"ISMI", "", "WHODAS", 
+"", "Monthly_income", "", 
+"",  "Education", "", 
+rows = 4)
+
+plot_nomediation_est_cfa <- graph_sem(model = fit_model_est_nomed,   # model fit
+          layout = lay,        # layout
+          angle = 170          # adjust the arrows 
+          #label = "est_std"   # get standardized results (not rounded)
+          )
+
+plot_nomediation_est_cfa
+
+semPlot::semPaths(fit_model_est_nomed, "std", layout = "tree", intercepts = F, residuals = T, nDigits = 2)
+    
+# compare fits
+
+
+```
+
+```{r SEM mediation estimated cfa ismi whodas}
+library(lavaan) 
+
+model_est_cfa <-'
+## Measurement ##
+ISMI =~ ismi_1 + ismi_2 + ismi_3 +ismi_4 + ismi_5 + ismi_6 + ismi_7 + ismi_8 + ismi_9 + ismi_10 
+
+WHODAS =~ whodas_1 + whodas_2 + whodas_3 + whodas_4 + whodas_5 + whodas_6 + whodas_7 + whodas_8 + whodas_9 + whodas_10 + whodas_11 + whodas_12
+
+## Direct effect ##
+ISMI ~ c*WHODAS
+
+## Mediator 1 ##
+Involuntary_hospitalization ~ a*WHODAS
+ISMI ~ b*Involuntary_hospitalization
+
+## Mediator 2 ##
+Monthly_income ~ d*WHODAS + Education
+ISMI ~ e*Monthly_income
+
+## Indirect effect 1 (a*b) ##
+ab := a*b
+
+## Indirect effect 2 (d*e) ##
+de := d*e
+
+## Total effect ##
+total := c + (a*b) + (d*e)
+'
+
+
+fit_model_est_cfa <- cfa(model = model_est_cfa, # model formula
+                   data=data_est, # data frame
+                   estimator = "DWLS"
+  )
+
+
+summary(fit_model_est_cfa, fit.measures = T, standardized=TRUE)
+# anova(fit_model_est_cfa, fit_model_est_nomed)
+```
+
+```{r SEM mediation visualization estimated cfa ismi whodas}
+library(tidySEM)
+
+lay <- get_layout(
+"","","","","whodas_1",  
+"ismi_1","","","","whodas_2",  
+"ismi_2","","Involuntary_hospitalization","","whodas_3",  
+"ismi_3","","","","whodas_4",
+"ismi_4","", "", "", "whodas_5",
+"","ISMI","","WHODAS","",
+"ismi_5","", "", "", "whodas_6",
+"ismi_6","", "", "", "whodas_7",
+"ismi_7","",  "Monthly_income", "","whodas_8",
+"ismi_8","","","","whodas_9",  
+"ismi_9","","","","whodas_10", 
+"ismi_10","","Education","","whodas_11",
+"","","","","whodas_12",  
+rows = 13)
+
+plot_mediation_est_cfa <- graph_sem(model = fit_model_est_cfa,   # model fit
+          layout = lay,        # layout
+          angle = 170,          # adjust the arrows 
+          variance_diameter = 0.5,
+          text_size = 4,
+          rect_width = 0.8,
+          rect_height = 4,
+          spacing_y = 4,
+          ellipses_width = 0.9,
+          ellipses_height = 5,
+          )
+
+plot_mediation_est_cfa
+
+
+```
+
