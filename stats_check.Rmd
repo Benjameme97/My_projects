@@ -1,5 +1,5 @@
 ---
-title: "Statistical simulation and power analysis"
+title: "Data simulation and power analysis of Badger & Reddy, 2009"
 author: "Benjamín Kunc"
 date: '`r Sys.Date()`'
 output: html_document
@@ -12,10 +12,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # The effects of birth order on personality traits and feelings of academic sibling rivalry (Julia Badger & Peter Reddy, 2009)
 
-I have decided to investigate the data from this study. The sample size is suspiciously small, while the  statistical results are reported to be significant. I want to check the power of their analysis and see what is the probability of arriving to significant results with simulated data of the same parameters (N, M, SD).
+I have decided to investigate the results from Julia Badger & Peter Reddy, 2009. The sample size is suspiciously small, while the  statistical results are reported to be significant. I want to rerun their analyses and see what is the probability of arriving to significant results with simulated data of the same parameters (N, M, SD).
+
+The abstract of the study states:
+
+"The influence of birth order on personality and sibling rivalry is controversial; little research has been conducted into academic sibling rivalry, and none into the connection with personality traits. This study considers the interaction of all three factors. Firstborns (N=22) and lastborns (N=24) completed online personality tests and an Academic Sibling Rivalry Questionnaire. Lastborns were found to experience more academic sibling rivalry: t=2.33, DF=44; p<.05, whereas firstborns are more likely to be conscientious: F(1,44)=3.58; p< .05, and dutiful: F(1,44)=5.39; p<.05. This raises possible implications in domains including education, health and psychotherapy. Further research could be conducted to expand these findings in terms of variables and geographical location"
 
 
-Data for siblings' rivalry 
+
+#Simulation of data and ANOVA tests for siblings' rivalry. 
 
 ```{r data for rivalry, warning=FALSE}
 
@@ -23,23 +28,23 @@ t.vect_riv <- vector(length=10000)
 p.vect_riv <- vector(length=10000)
 
 for(i in 1:10000){
-  firstborn_rival <- rnorm(23, mean = 50.18, sd = 16.11)
-  lastborn_rival <- rnorm(23, mean = 60.38, sd = 13.53)
-  or_riv <- as.factor(c(rep(0:1, each = 23, len = 46)))
-  df_riv <- data.frame(c(rbind(firstborn_rival, lastborn_rival)), or_riv)
-  mtest_riv <- summary.aov(aov(df_riv$c.rbind.firstborn_rival..lastborn_rival.. ~ or_riv))
-  t.vect_riv[i] <- mtest_riv[[1]][["F value"]]
-  p.vect_riv[i] <- mtest_riv[[1]][["Pr(>F)"]]
+  firstborn_rival <- rnorm(23, mean = 50.18, sd = 16.11) # data for measured rivalry in firstborns
+  lastborn_rival <- rnorm(23, mean = 60.38, sd = 13.53) # data for measured rivalry in lastborns
+  or_riv <- as.factor(c(rep(0:1, each = 23, len = 46))) # factor of group for each observation
+  df_riv <- data.frame(c(rbind(firstborn_rival, lastborn_rival)), or_riv) # bind the data
+  mtest_riv <- summary.aov(aov(df_riv$c.rbind.firstborn_rival..lastborn_rival.. ~ or_riv)) # ANOVA
+  t.vect_riv[i] <- mtest_riv[[1]][["F value"]] # Extract F values
+  p.vect_riv[i] <- mtest_riv[[1]][["Pr(>F)"]] # Extract p-values
 }
 
-# significant results of rivalry data
 
-table(p.vect_riv < 0.05)
 
+table(p.vect_riv < 0.05) # significant results of rivalry data
+ 
 
 ```
 
-Data for siblings' conscientiousness 
+#Simulation of data and ANOVA tests for siblings' conscientiousness 
 
 ```{r data for conscientiousness, warning=FALSE}
 
@@ -47,22 +52,24 @@ t.vect_cons <- vector(length=10000)
 p.vect_cons <- vector(length=10000)
 
 for(i in 1:10000){
-  firstborn_cons <- rnorm(23, mean = 54.45, sd = 7.1)
-  lastborn_cons <- rnorm(23, mean = 38.88, sd = 28.64)
-  or_cons <- as.factor(c(rep(0:1, each = 23, len = 46)))
-  df_cons <- data.frame(c(rbind(firstborn_cons, lastborn_cons)), or_cons)
-  mtest_cons <- summary.aov(aov(df_cons$c.rbind.firstborn_cons..lastborn_cons.. ~ or_cons))
-  t.vect_cons[i] <- mtest_cons[[1]][["F value"]]
-  p.vect_cons[i] <- mtest_cons[[1]][["Pr(>F)"]]
+  firstborn_cons <- rnorm(23, mean = 54.45, sd = 7.1) # data for measured conscientiousness in firstborns
+  lastborn_cons <- rnorm(23, mean = 38.88, sd = 28.64) # data for measured conscientiousness in lastborns
+  or_cons <- as.factor(c(rep(0:1, each = 23, len = 46))) # factor of group for each observation
+  df_cons <- data.frame(c(rbind(firstborn_cons, lastborn_cons)), or_cons) # bind the data
+  mtest_cons <- summary.aov(aov(df_cons$c.rbind.firstborn_cons..lastborn_cons.. ~ or_cons)) # ANOVA
+  t.vect_cons[i] <- mtest_cons[[1]][["F value"]] # Extract F values
+  p.vect_cons[i] <- mtest_cons[[1]][["Pr(>F)"]] # Extract p-values
 }
 
-# significant results of conscientiousness data
 
-table(p.vect_cons < 0.05)
+
+table(p.vect_cons < 0.05) # significant results of conscientiousness data
 
 
 ```
-Testing simulated data with equal parameters to check if the simluation runs properly
+
+Testing simulated data for two groups with equal parameters to check if the simluation runs properly:
+
 ```{r false-positive, warning=FALSE}
 # find significant results for clearly false-positive tests
 
@@ -71,8 +78,8 @@ t.vect_falsepos <- vector(length=10000)
 p.vect_falsepos <- vector(length=10000)
 
 for(i in 1:10000){
-  firstborn_falsepos <- rnorm(23, mean = 50, sd = 50)
-  lastborn_falsepos <- rnorm(23, mean = 50, sd = 50)
+  firstborn_falsepos <- rnorm(23, mean = 50, sd = 50) # group 1
+  lastborn_falsepos <- rnorm(23, mean = 50, sd = 50) # group 2
   or_falsepos <- as.factor(c(rep(0:1, each = 23, len = 46)))
   df_falsepos <- data.frame(c(rbind(firstborn_falsepos, lastborn_falsepos)), or_falsepos)
   mtest_falsepos <- summary.aov(aov(df_falsepos[,1] ~ or_falsepos))
@@ -89,9 +96,8 @@ table(p.vect_falsepos < 0.05)
 ```
 
 
-
-
 ```{r histograms, include=FALSE}
+# This chunk of chode serves for graphical exploration of the two simulated samples.
 
 hg_fb_rivalry <- hist(rnorm(23, mean = 54.45, sd = 7.1), plot = FALSE) # Save first histogram data
 hg_lb_rivalry <- hist(rnorm(23, mean = 60.38, sd = 13.53), plot = FALSE) # Save 2nd histogram data
@@ -104,7 +110,16 @@ plot(hg_lb_rivalry, col = c2, add = TRUE) # Add 2nd histogram using different co
 ```
 
 
-# Conclusion 
+# Results
 
-The proportion of significant results from the original data tends to converge to less than 5 %. This is probably caused by using ANOVA where one of the two compared groups has huge variance. In combination with a rather small number of DoF (computed from the sample size), the ANOVA rarely arrives to significant results.
+The proportion of significant results from the simulated data converges to less than 5 % of all the results. 
 
+# Discussion
+
+The tests of differences on the data with the original study's parameters yields significant results in less than 5 % of the cases. This results casts doubts on the trustworthiness of the statistical power in the study and the overall results. Even under the null hypothesis of no statistical difference between two groups, statistical tests are usually expected to yield significant results in about 5 % of cases. Throughout the 10,000 simulations of data with the same parametrs and associated statistical tests, less than 5 % of the results is significant and this holds even when the simluations are rerun again. 
+
+These results suggest that with such data, it would be extremely unlikely that the alternative hypothesis about existence of some difference between the two group could be supported. Therefore, it is reasonable to assume that the statistical power for the given tests was inadequately low. Furthermore, given the distribution of all the possible results that could have emerged from the used statistical test, the authors arrived at a significant one. Due to the existing incentives for publishing findings with positive results, it seems that the authors were enviably lucky with their data. 
+
+The fact that the chance of getting significant results was lower than 5 % is probably caused by using ANOVA on data with two groups, where one of the groups has vast variance. In combination with rather a small number of degrees of freedom (as computed from the sample size), this type of ANOVA rarely yields statistically significant results. 
+
+One of the possible explanations for the authors' most unlikely significant results is the assumption about normal distribution used in my simulations. Even with the same parameters of sample size, mean, and standard deviation, the distribution of the authors' gathered data could have been different. Therefore, my estimates of the chances for finding significant results might be relatively underrated. Other explanations include the factor of extreme luck or the application of some of the questionable research practices.
